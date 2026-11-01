@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Lost and Found Items</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f6fb;
+            margin: 0;
+        }
+
+        header {
+            background: #173b70;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #173b70;
+            text-align: center;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin: 25px 0;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #aaa;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 12px 18px;
+            background: #245493;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 4px;
+        }
+
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        .filters button {
+            background: #dce5f2;
+            color: #173b70;
+        }
+
+        .filters button.active {
+            background: #173b70;
+            color: white;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px #ccc;
+        }
+
+        .card h3 {
+            color: #173b70;
+        }
+
+        .lost {
+            color: red;
+            font-weight: bold;
+        }
+
+        .found {
+            color: green;
+            font-weight: bold;
+        }
+
+        #results {
+            margin-top: 20px;
+        }
+
+        .message {
+            text-align: center;
+            color: #555;
+        }
+
+        .edit-button {
+            background: #16804a;
+        }
+
+        .delete-button {
+            background: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>College Lost & Found Portal</h1>
+</header>
+
+<div class="container">
+
+    <h2>Search Lost and Found Items</h2>
+
+    <div class="search-box">
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Enter item name..."
+        >
+
+        <button onclick="searchItems()">Search</button>
+    </div>
+
+    <div class="filters">
+        <button class="active" onclick="filterItems('All', this)">
+            All Items
+        </button>
+
+        <button onclick="filterItems('Lost', this)">
+            Lost Items
+        </button>
+
+        <button onclick="filterItems('Found', this)">
+            Found Items
+        </button>
+    </div>
+
+    <div id="results">
+        <p class="message">Loading items...</p>
+    </div>
+
+</div>
+
+<script>
+
+    let allItems = [];
+    let selectedType = "All";
+
+    // Load items from database
+    async function loadItems() {
+        try {
+            const response = await fetch("/api/items");
+
+            if (!response.ok) {
+                throw new Error("Unable to load items");
+            }
+
+            allItems = await response.json();
+            displayItems();
+
+        } catch (error) {
+            document.getElementById("results").textContent =
+                "Unable to connect to server.";
+        }
+    }
+
+    // Filter items
+    function filterItems(type, button) {
+        selectedType = type;
+
+        document.querySelectorAll(".filters button")
+            .forEach(function(btn) {
+                btn.classList.remove("active");
+            });
+
+        button.classList.add("active");
+        displayItems();
+    }
+
+    // Search items
+    function searchItems() {
+        displayItems();
+    }
+
+    // Display items
+    function displayItems() {
+
+        const results = document.getElementById("results");
+
+        const searchText = document.getElementById("searchInput")
+            .value.trim().toLowerCase();
+
+        const filteredItems = allItems.filter(function(item) {
+
+            const matchesType =
+                selectedType === "All" ||
+                (item.type || "").toLowerCase() ===
+                selectedType.toLowerCase();
+
+            const matchesSearch =
+                (item.item_name || "").toLowerCase().includes(searchText) ||
+                (item.category || "").toLowerCase().includes(searchText) ||
+                (item.location || "").toLowerCase().includes(searchText);
+
+            return matchesType && matchesSearch;
+        });
+
+        results.innerHTML = "";
+
+        if (filteredItems.length === 0) {
+            results.innerHTML =
+                '<p class="message">No matching items found.</p>';
+            return;
+        }
+
+        filteredItems.forEach(function(item) {
+
+            const card = document.createElement("div");
+            card.className = "card";
+
+            const heading = document.createElement("h3");
+            heading.textContent = item.item_name || "Unnamed item";
+            card.appendChild(heading);
+
+            addDetail(card, "Student Name", item.student_name);
+            addDetail(card, "Category", item.category);
+            addDetail(card, "Location", item.location);
+            addDetail(card, "Date", item.item_date);
+            addDetail(card, "Description", item.description);
+
+            const status = document.createElement("p");
+            status.textContent = "Status: " + item.type;
+
+            status.className =
+                (item.type || "").toLowerCase() === "lost"
+                ? "lost" : "found";
+
+            card.appendChild(status);
+
+            // Edit button
+            const editButton = document.createElement("button");
+            editButton.textContent = "Edit Item";
+            editButton.className = "edit-button";
+
+            editButton.onclick = function() {
+                editItem(item);
+            };
+
+            card.appendChild(editButton);
+
+            // Delete button
+            const deleteButton = document.createElement("button");
+            deleteButton.textContent = "Delete Item";
+            deleteButton.className = "delete-button";
+
+            deleteButton.onclick = function() {
+                deleteItem(item.id);
+            };
+
+            card.appendChild(deleteButton);
+
+            results.appendChild(card);
+        });
+    }
+
+    // Add item details
+    function addDetail(card, label, value) {
+
+        const paragraph = document.createElement("p");
+
+        paragraph.textContent =
+            label + ": " + (value || "Not provided");
+
+        card.appendChild(paragraph);
+    }
+
+    // Edit item
+    async function editItem(item) {
+
+        const studentName = prompt(
+            "Enter Student Name:", item.student_name || ""
+        );
+        if (studentName === null) return;
+
+        const itemName = prompt(
+            "Enter Item Name:", item.item_name || ""
+        );
+        if (itemName === null) return;
+
+        const category = prompt(
+            "Enter Category:", item.category || ""
+        );
+        if (category === null) return;
+
+        const location = prompt(
+            "Enter Location:", item.location || ""
+        );
+        if (location === null) return;
+
+        const itemDate = prompt(
+            "Enter Date:", item.item_date || ""
+        );
+        if (itemDate === null) return;
+
+        const description = prompt(
+            "Enter Description:", item.description || ""
+        );
+        if (description === null) return;
+
+        if (!studentName.trim() || !itemName.trim()) {
+            alert("Student name and item name are required.");
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/items/" + item.id, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_name: studentName,
+                    item_name: itemName,
+                    category: category,
+                    location: location,
+                    item_date: itemDate,
+                    description: description
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert("Item updated successfully!");
+                loadItems();
+            } else {
+                alert(result.message);
+            }
+
+        } catch (error) {
+            alert("Unable to update item.");
+        }
+    }
+
+    // Delete item
+    async function deleteItem(id) {
+
+        const confirmDelete = confirm(
+            "Are you sure you want to delete this item?"
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch("/api/items/" + id, {
+                method: "DELETE"
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert(result.message);
+                loadItems();
+            } else {
+                alert(result.message);
+            }
+
+        } catch (error) {
+            alert("Unable to delete item.");
+        }
+    }
+
+    // Search while typing
+    document.getElementById("searchInput")
+        .addEventListener("input", displayItems);
+
+    // Load items
+    loadItems();
+
+</script>
+<a href="index.html">Back to Home</a>
+</body>
+</html>
